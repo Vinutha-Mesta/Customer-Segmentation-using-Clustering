@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Customer Segmentation Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b0d12;
+      --surface: #13161e;
+      --card: #1a1e2b;
+      --border: #252a38;
+      --accent: #6c63ff;
+      --accent2: #ff6b9d;
+      --accent3: #43e8c8;
+      --text: #e8eaf0;
+      --muted: #7a8099;
+      --cluster-0: #ff6b6b;
+      --cluster-1: #4ecdc4;
+      --cluster-2: #ffd93d;
+      --cluster-3: #a29bfe;
+      --cluster-4: #fd79a8;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Header ───────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .logo-icon {
+      width: 34px; height: 34px; background: var(--accent);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .logo-text { font-family: 'Space Mono', monospace; font-size: 15px; font-weight: 700; }
+    .logo-sub { font-size: 11px; color: var(--muted); letter-spacing: 0.05em; }
+
+    .api-status {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 20px; padding: 6px 14px; font-size: 12px;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #aaa; }
+    .dot.online { background: var(--accent3); box-shadow: 0 0 6px var(--accent3); }
+
+    /* ── Nav Tabs ─────────────────────────────────────────── */
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      display: flex; gap: 4px;
+    }
+    .tab {
+      padding: 14px 20px; cursor: pointer;
+      font-size: 13px; font-weight: 500; color: var(--muted);
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s; white-space: nowrap;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── Layout ───────────────────────────────────────────── */
+    main { padding: 28px 32px; max-width: 1400px; margin: 0 auto; }
+
+    .page { display: none; }
+    .page.active { display: block; }
+
+    .page-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    .page-sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+
+    /* ── Stats Row ────────────────────────────────────────── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px; margin-bottom: 28px;
+    }
+    .stat-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px;
+    }
+    .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+    .stat-value { font-size: 28px; font-weight: 700; font-family: 'Space Mono', monospace; }
+    .stat-value.accent { color: var(--accent); }
+    .stat-value.accent2 { color: var(--accent2); }
+    .stat-value.accent3 { color: var(--accent3); }
+    .stat-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    /* ── Grid ─────────────────────────────────────────────── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+
+    /* ── Card ─────────────────────────────────────────────── */
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 22px;
+    }
+    .card-title {
+      font-size: 13px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.07em; color: var(--muted); margin-bottom: 18px;
+    }
+
+    /* ── Table ────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th {
+      padding: 10px 14px; text-align: left;
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--muted); background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+    tbody tr:hover td { background: rgba(108,99,255,0.05); }
+    tbody tr:last-child td { border-bottom: none; }
+
+    /* ── Controls ─────────────────────────────────────────── */
+    .controls {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 22px;
+      display: flex; gap: 20px; align-items: flex-end;
+      flex-wrap: wrap; margin-bottom: 24px;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label { font-size: 12px; color: var(--muted); font-weight: 500; }
+    .form-group select,
+    .form-group input {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); border-radius: 8px; padding: 9px 14px;
+      font-size: 14px; font-family: 'DM Sans', sans-serif;
+      outline: none; min-width: 120px;
+    }
+    .form-group select:focus,
+    .form-group input:focus { border-color: var(--accent); }
+
+    /* ── Buttons ──────────────────────────────────────────── */
+    .btn {
+      padding: 10px 22px; border-radius: 8px; border: none;
+      cursor: pointer; font-size: 13px; font-weight: 600;
+      font-family: 'DM Sans', sans-serif;
+      transition: all 0.2s; white-space: nowrap;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #5a52e0; transform: translateY(-1px); }
+    .btn-primary:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; transform: none; }
+
+    /* ── Cluster Chips ────────────────────────────────────── */
+    .cluster-cards {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px; margin-top: 4px;
+    }
+    .cluster-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 18px;
+      border-left: 3px solid var(--accent);
+    }
+    .cluster-card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+    .cluster-stat { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; }
+    .cluster-stat-label { color: var(--muted); }
+    .cluster-stat-value { font-weight: 600; }
+
+    /* ── Predict Form ─────────────────────────────────────── */
+    .predict-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 16px; margin-bottom: 20px;
+    }
+    .result-box {
+      background: var(--surface); border: 2px solid var(--accent);
+      border-radius: 14px; padding: 24px; text-align: center;
+      margin-top: 4px;
+    }
+    .result-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+    .result-cluster { font-size: 32px; font-weight: 700; font-family: 'Space Mono', monospace; color: var(--accent); }
+    .result-name { font-size: 15px; margin-top: 6px; }
+
+    /* ── Loader ───────────────────────────────────────────── */
+    .spinner {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Toast ────────────────────────────────────────────── */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--card); border: 1px solid var(--border);
+      padding: 14px 20px; border-radius: 10px; font-size: 13px;
+      opacity: 0; transform: translateY(10px);
+      transition: all 0.3s; pointer-events: none; z-index: 999;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    canvas { max-height: 360px; }
+
+    @media (max-width: 900px) {
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .grid-2, .grid-3, .predict-grid { grid-template-columns: 1fr; }
+      nav { overflow-x: auto; }
+      main { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🎯</div>
+    <div>
+      <div class="logo-text">SegmentIQ</div>
+      <div class="logo-sub">Customer Segmentation Platform</div>
+    </div>
+  </div>
+  <div class="api-status">
+    <div class="dot" id="api-dot"></div>
+    <span id="api-status-text">Connecting…</span>
+  </div>
+</header>
+
+<!-- Tabs -->
+<nav>
+  <div class="tab active" onclick="showTab('overview')">📊 Overview</div>
+  <div class="tab" onclick="showTab('data')">📋 Dataset</div>
+  <div class="tab" onclick="showTab('elbow')">📈 Elbow Method</div>
+  <div class="tab" onclick="showTab('cluster')">🔵 Clustering</div>
+  <div class="tab" onclick="showTab('predict')">🔮 Predict</div>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PAGE: OVERVIEW -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<main>
+<div class="page active" id="page-overview">
+  <div class="page-title">Dashboard Overview</div>
+  <div class="page-sub">Customer data summary and key statistics</div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Total Customers</div>
+      <div class="stat-value accent" id="stat-total">—</div>
+      <div class="stat-sub">in dataset</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Age</div>
+      <div class="stat-value" id="stat-age">—</div>
+      <div class="stat-sub">years</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Annual Income</div>
+      <div class="stat-value accent2" id="stat-income">—</div>
+      <div class="stat-sub">₹ per year</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Spending Score</div>
+      <div class="stat-value accent3" id="stat-spending">—</div>
+      <div class="stat-sub">out of 100</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Spending Score Distribution</div>
+      <canvas id="chart-spending"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Income vs Spending Score</div>
+      <canvas id="chart-scatter-overview"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Project Workflow</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;">
+      <div id="step-flow"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PAGE: DATASET -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="page" id="page-data">
+  <div class="page-title">Dataset Viewer</div>
+  <div class="page-sub">Preview of the customer dataset (first 10 rows)</div>
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead id="data-head"></thead>
+        <tbody id="data-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PAGE: ELBOW -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="page" id="page-elbow">
+  <div class="page-title">Elbow Method</div>
+  <div class="page-sub">Determines the optimal number of clusters K using WCSS</div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <div class="card-title">WCSS vs Number of Clusters (K)</div>
+    <canvas id="chart-elbow" style="max-height:420px;"></canvas>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">What is WCSS?</div>
+      <p style="font-size:13px;color:var(--muted);line-height:1.7;">
+        WCSS (Within Cluster Sum of Squares) measures the compactness of clusters.
+        Lower WCSS means tighter, more defined clusters. The "elbow" is the point where adding more clusters gives diminishing returns.
+      </p>
+    </div>
+    <div class="card">
+      <div class="card-title">WCSS Values Table</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>K</th><th>WCSS</th><th>Reduction</th></tr></thead>
+          <tbody id="wcss-table"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PAGE: CLUSTERING -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="page" id="page-cluster">
+  <div class="page-title">K-Means Clustering</div>
+  <div class="page-sub">Run clustering and visualize customer segments</div>
+
+  <div class="controls">
+    <div class="form-group">
+      <label>Number of Clusters (K)</label>
+      <select id="k-select">
+        <option value="3">K = 3</option>
+        <option value="4">K = 4</option>
+        <option value="5" selected>K = 5</option>
+        <option value="6">K = 6</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Feature X-Axis</label>
+      <select id="feat-x">
+        <option value="Annual_Income" selected>Annual Income</option>
+        <option value="Age">Age</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Feature Y-Axis</label>
+      <select id="feat-y">
+        <option value="Spending_Score" selected>Spending Score</option>
+        <option value="Purchase_Frequency">Purchase Frequency</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" id="run-btn" onclick="runClustering()">▶ Run Clustering</button>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Cluster Scatter Plot</div>
+      <canvas id="chart-cluster"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Cluster Size Distribution</div>
+      <canvas id="chart-pie"></canvas>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:0;">
+    <div class="card-title">Cluster Summaries</div>
+    <div class="cluster-cards" id="cluster-cards"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PAGE: PREDICT -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="page" id="page-predict">
+  <div class="page-title">Predict Customer Segment</div>
+  <div class="page-sub">Enter a customer's details to find which segment they belong to</div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <div class="card-title">Customer Details</div>
+    <div class="predict-grid">
+      <div class="form-group">
+        <label>Age</label>
+        <input type="number" id="p-age" value="30" min="18" max="80"/>
+      </div>
+      <div class="form-group">
+        <label>Gender</label>
+        <select id="p-gender"><option>Male</option><option>Female</option></select>
+      </div>
+      <div class="form-group">
+        <label>Annual Income (₹)</label>
+        <input type="number" id="p-income" value="60000" min="10000"/>
+      </div>
+      <div class="form-group">
+        <label>Spending Score (1–100)</label>
+        <input type="number" id="p-spending" value="50" min="1" max="100"/>
+      </div>
+      <div class="form-group">
+        <label>Purchase Frequency</label>
+        <input type="number" id="p-freq" value="10" min="1"/>
+      </div>
+      <div class="form-group">
+        <label>Number of Clusters (K)</label>
+        <select id="p-k">
+          <option value="3">3</option><option value="4">4</option>
+          <option value="5" selected>5</option><option value="6">6</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="predictCluster()" id="predict-btn">🔮 Predict Segment</button>
+  </div>
+
+  <div id="predict-result" style="display:none;" class="result-box">
+    <div class="result-label">Predicted Cluster</div>
+    <div class="result-cluster" id="res-cluster-id">—</div>
+    <div class="result-name" id="res-cluster-name">—</div>
+    <hr style="border-color:var(--border);margin:16px 0;"/>
+    <div style="font-size:12px;color:var(--muted);" id="res-details"></div>
+  </div>
+</div>
+
+</main>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'http://localhost:5000/api';
+let overviewCharts = {}, elbowChart, clusterChart, pieChart;
+let allDataRows = [];
+
+// ── Helpers ────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const names = ['overview','data','elbow','cluster','predict'];
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  if (name === 'elbow' && !elbowChart) loadElbow();
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function loading(btnId, state) {
+  const btn = document.getElementById(btnId);
+  if (state) { btn.innerHTML = '<span class="spinner"></span>Running…'; btn.disabled = true; }
+  else { btn.innerHTML = btnId === 'run-btn' ? '▶ Run Clustering' : '🔮 Predict Segment'; btn.disabled = false; }
+}
+
+// ── Overview ───────────────────────────────────────────────
+async function loadOverview() {
+  try {
+    const r = await fetch(API+'/data');
+    const d = await r.json();
+    if (!d.success) throw new Error(d.error);
+
+    document.getElementById('api-dot').className = 'dot online';
+    document.getElementById('api-status-text').textContent = 'API Online';
+
+    const s = d.stats;
+    document.getElementById('stat-total').textContent = s.total_customers;
+    document.getElementById('stat-age').textContent = s.avg_age;
+    document.getElementById('stat-income').textContent = '₹'+s.avg_income.toLocaleString();
+    document.getElementById('stat-spending').textContent = s.avg_spending;
+
+    allDataRows = d.preview;
+    renderTable(d.preview, s.columns);
+    buildOverviewCharts(d.preview);
+    buildWorkflow();
+  } catch(e) {
+    document.getElementById('api-status-text').textContent = 'API Offline';
+    toast('⚠ Backend not reachable. Start Flask server.');
+    buildDemoOverview();
+  }
+}
+
+function buildDemoOverview() {
+  document.getElementById('stat-total').textContent = '200';
+  document.getElementById('stat-age').textContent = '38.9';
+  document.getElementById('stat-income').textContent = '₹60,560';
+  document.getElementById('stat-spending').textContent = '50.2';
+  buildWorkflow();
+}
+
+function buildWorkflow() {
+  const steps = ['Data Collection','Preprocessing','Feature Selection','Elbow Method','K-Means','Visualization','Analysis'];
+  const colors = ['#6c63ff','#ff6b9d','#43e8c8','#ffd93d','#ff6b6b','#4ecdc4','#a29bfe'];
+  document.getElementById('step-flow').innerHTML = steps.map((s,i) => `
+    <div style="display:inline-flex;align-items:center;gap:6px;margin:4px;">
+      <div style="background:${colors[i]};color:#fff;border-radius:6px;padding:8px 14px;font-size:12px;font-weight:600;">${i+1}. ${s}</div>
+      ${i<steps.length-1?'<span style="color:var(--muted)">→</span>':''}
+    </div>
+  `).join('');
+}
+
+function buildOverviewCharts(rows) {
+  const spending = rows.map(r => r.Spending_Score);
+  const income = rows.map(r => r.Annual_Income);
+
+  const cfg = { responsive: true, plugins: { legend: { display: false } },
+    scales: { x: { grid: { color:'rgba(255,255,255,0.05)' }, ticks:{color:'#7a8099'} },
+              y: { grid: { color:'rgba(255,255,255,0.05)' }, ticks:{color:'#7a8099'} } } };
+
+  new Chart(document.getElementById('chart-spending'), {
+    type: 'bar',
+    data: { labels: spending.map((_,i)=>''), datasets: [{
+      data: spending, backgroundColor: '#6c63ff88', borderColor: '#6c63ff', borderWidth: 1
+    }]},
+    options: { ...cfg, plugins: { legend: { display: false } } }
+  });
+
+  new Chart(document.getElementById('chart-scatter-overview'), {
+    type: 'scatter',
+    data: { datasets: [{ data: rows.map(r=>({x:r.Annual_Income,y:r.Spending_Score})),
+      backgroundColor:'#ff6b9d66', borderColor:'#ff6b9d', pointRadius:4 }]},
+    options: { ...cfg, plugins: { legend:{display:false} },
+      scales: { x:{...cfg.scales.x,title:{display:true,text:'Annual Income',color:'#7a8099'}},
+                y:{...cfg.scales.y,title:{display:true,text:'Spending Score',color:'#7a8099'}} } }
+  });
+}
+
+// ── Dataset Table ──────────────────────────────────────────
+function renderTable(rows, cols) {
+  const thead = document.getElementById('data-head');
+  const tbody = document.getElementById('data-body');
+  thead.innerHTML = '<tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
+  tbody.innerHTML = rows.map(row =>
+    '<tr>'+cols.map(c=>`<td>${row[c] !== undefined ? row[c] : '—'}</td>`).join('')+'</tr>'
+  ).join('');
+}
+
+// ── Elbow ──────────────────────────────────────────────────
+async function loadElbow() {
+  try {
+    const r = await fetch(API+'/elbow');
+    const d = await r.json();
+    if (!d.success) throw new Error(d.error);
+    drawElbow(d.k_values, d.wcss);
+  } catch(e) {
+    // demo data
+    const k = [1,2,3,4,5,6,7,8,9,10];
+    const w = [1000,600,350,220,140,110,90,78,70,65];
+    drawElbow(k, w);
+  }
+}
+
+function drawElbow(k_vals, wcss) {
+  if (elbowChart) elbowChart.destroy();
+  elbowChart = new Chart(document.getElementById('chart-elbow'), {
+    type: 'line',
+    data: {
+      labels: k_vals,
+      datasets: [{
+        label: 'WCSS',
+        data: wcss,
+        borderColor: '#6c63ff', backgroundColor: 'rgba(108,99,255,0.1)',
+        pointBackgroundColor: k_vals.map(k=>k===5?'#ff6b9d':'#6c63ff'),
+        pointRadius: k_vals.map(k=>k===5?8:5),
+        borderWidth: 2, fill: true, tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: '#e8eaf0' } },
+        annotation: {}
+      },
+      scales: {
+        x: { title:{display:true,text:'Number of Clusters (K)',color:'#7a8099'}, grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#7a8099'} },
+        y: { title:{display:true,text:'WCSS',color:'#7a8099'}, grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#7a8099'} }
+      }
+    }
+  });
+
+  // Table
+  const tbody = document.getElementById('wcss-table');
+  tbody.innerHTML = wcss.map((w,i) => {
+    const prev = i > 0 ? wcss[i-1] : null;
+    const red = prev ? ((prev-w)/prev*100).toFixed(1)+'%' : '—';
+    const badge = k_vals[i]===5 ? ' <span style="background:#6c63ff;color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;">optimal</span>' : '';
+    return `<tr><td>K = ${k_vals[i]}${badge}</td><td>${w.toLocaleString()}</td><td style="color:${i?'#43e8c8':'var(--muted)'}">${red}</td></tr>`;
+  }).join('');
+}
+
+// ── Clustering ─────────────────────────────────────────────
+const COLORS = ['#ff6b6b','#4ecdc4','#ffd93d','#a29bfe','#fd79a8','#74b9ff'];
+
+async function runClustering() {
+  loading('run-btn', true);
+  const k = parseInt(document.getElementById('k-select').value);
+  try {
+    const r = await fetch(API+'/cluster', {
+      method: 'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ k, features: ['Annual_Income','Spending_Score'] })
+    });
+    const d = await r.json();
+    if (!d.success) throw new Error(d.error);
+    drawClusters(d.scatter_data, d.centroids, d.summary, k);
+    renderClusterCards(d.summary);
+    toast(`✅ Clustered into ${k} segments!`);
+  } catch(e) {
+    toast('⚠ Backend offline — showing demo clusters');
+    demoCluster(k);
+  } finally { loading('run-btn', false); }
+}
+
+function drawClusters(points, centroids, summary, k) {
+  if (clusterChart) clusterChart.destroy();
+  if (pieChart) pieChart.destroy();
+
+  const datasets = [];
+  for (let i = 0; i < k; i++) {
+    const pts = points.filter(p=>p.cluster===i).map(p=>({x:p.x,y:p.y}));
+    datasets.push({ label:`Cluster ${i}`, data:pts,
+      backgroundColor: COLORS[i]+'aa', borderColor: COLORS[i], pointRadius:5 });
+  }
+  if (centroids) {
+    datasets.push({ label:'Centroids', data:centroids.map(c=>({x:c.x,y:c.y})),
+      backgroundColor:'#fff', borderColor:'#000', pointStyle:'crossRot', pointRadius:10, pointBorderWidth:2 });
+  }
+
+  const scaleOpts = { grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#7a8099'} };
+  clusterChart = new Chart(document.getElementById('chart-cluster'), {
+    type:'scatter', data:{datasets},
+    options:{ responsive:true, plugins:{legend:{labels:{color:'#e8eaf0',font:{size:11}}}},
+      scales:{ x:{...scaleOpts,title:{display:true,text:'Annual Income (₹)',color:'#7a8099'}},
+               y:{...scaleOpts,title:{display:true,text:'Spending Score',color:'#7a8099'}} } }
+  });
+
+  pieChart = new Chart(document.getElementById('chart-pie'), {
+    type:'doughnut',
+    data:{ labels:summary.map(s=>`Cluster ${s.cluster_id}`),
+           datasets:[{data:summary.map(s=>s.count),
+             backgroundColor:COLORS.slice(0,k), borderColor:'#1a1e2b', borderWidth:3}] },
+    options:{ responsive:true, plugins:{legend:{labels:{color:'#e8eaf0'}}} }
+  });
+}
+
+function renderClusterCards(summary) {
+  const colors = COLORS;
+  document.getElementById('cluster-cards').innerHTML = summary.map((s,i) => `
+    <div class="cluster-card" style="border-left-color:${colors[i]}">
+      <div class="cluster-card-title" style="color:${colors[i]}">${s.label}</div>
+      <div class="cluster-stat"><span class="cluster-stat-label">Count</span><span class="cluster-stat-value">${s.count} customers</span></div>
+      <div class="cluster-stat"><span class="cluster-stat-label">Avg Age</span><span class="cluster-stat-value">${s.avg_age} yrs</span></div>
+      <div class="cluster-stat"><span class="cluster-stat-label">Avg Income</span><span class="cluster-stat-value">₹${s.avg_income.toLocaleString()}</span></div>
+      <div class="cluster-stat"><span class="cluster-stat-label">Avg Spending</span><span class="cluster-stat-value">${s.avg_spending}/100</span></div>
+      <div class="cluster-stat"><span class="cluster-stat-label">Avg Frequency</span><span class="cluster-stat-value">${s.avg_frequency}x</span></div>
+    </div>
+  `).join('');
+}
+
+function demoCluster(k) {
+  const demo = [];
+  const summary = [];
+  for (let i = 0; i < k; i++) {
+    const cx = 20000 + i * 25000, cy = 20 + i * 15;
+    for (let j = 0; j < 40; j++) {
+      demo.push({ cluster:i, x: cx + (Math.random()-0.5)*10000, y: cy + (Math.random()-0.5)*20 });
+    }
+    summary.push({ cluster_id:i, label:`Cluster ${i}`, count:40,
+      avg_age:25+i*5, avg_income:cx, avg_spending:cy, avg_frequency:5+i*2 });
+  }
+  drawClusters(demo, null, summary, k);
+  renderClusterCards(summary);
+}
+
+// ── Predict ────────────────────────────────────────────────
+async function predictCluster() {
+  loading('predict-btn', true);
+  const body = {
+    age: +document.getElementById('p-age').value,
+    gender: document.getElementById('p-gender').value,
+    annual_income: +document.getElementById('p-income').value,
+    spending_score: +document.getElementById('p-spending').value,
+    purchase_frequency: +document.getElementById('p-freq').value,
+    k: +document.getElementById('p-k').value
+  };
+  try {
+    const r = await fetch(API+'/predict', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (!d.success) throw new Error(d.error);
+    showResult(d.cluster_id, d.cluster_label, d.input);
+  } catch(e) {
+    showResult(2, '🎯 Mid Income – Mid Spenders', body);
+    toast('⚠ Demo result — backend offline');
+  } finally { loading('predict-btn', false); }
+}
+
+function showResult(id, label, input) {
+  document.getElementById('predict-result').style.display = 'block';
+  document.getElementById('res-cluster-id').textContent = `Cluster ${id}`;
+  document.getElementById('res-cluster-name').textContent = label;
+  document.getElementById('res-cluster-id').style.color = COLORS[id] || '#6c63ff';
+  document.getElementById('res-details').innerHTML =
+    `Income: ₹${input.annual_income?.toLocaleString()} &nbsp;|&nbsp; Spending Score: ${input.spending_score} &nbsp;|&nbsp; Age: ${input.age} &nbsp;|&nbsp; Gender: ${input.gender}`;
+}
+
+// ── Init ───────────────────────────────────────────────────
+loadOverview();
+</script>
+</body>
+</html>
